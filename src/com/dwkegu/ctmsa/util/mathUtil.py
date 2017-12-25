@@ -58,5 +58,5 @@ def betaGenerate(shape):
 
 
 def invMatrix(m):
-
-    return m.I()
+    result = np.matrix(m).getI()
+    return result
