@@ -8,9 +8,9 @@ class Document:
         self.sentenceNum = 0
         self.sentences = []
         self.gamma = np.ndarray([K], np.float64)
-        self.oldGamma = self.gamma
+        self.oldGamma = self.gamma.copy()
         self.nu = np.ones([K], np.float64)
-        self.oldNu = self.nu
+        self.oldNu = self.nu.copy()
         self.logLikelihood = 0
         self.convergence = 1
         self.initDoc(rawIdDoc)

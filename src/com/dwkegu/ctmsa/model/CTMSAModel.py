@@ -28,6 +28,7 @@ class CTMSAModel:
         self.sigma = None
         self.invSigma = None
         self.paraLambda = (config.paraLambda if paraLambda is None else paraLambda)
+        self.oldParaLambda = self.paraLambda
         self.logBeta = None
         self.beta = None
         self.lHood = 0
@@ -37,6 +38,7 @@ class CTMSAModel:
         self.maxEMIter = maxEmIter
         self.maxVarIter = maxVarIter
         self.convergence = convergence
+        self.initParameters()
         self.saver = FileSaver()
 
     def initParameters(self):
@@ -68,11 +70,13 @@ class CTMSAModel:
                 self.updateNu(doc)
                 for sentence in doc.sentences:
                     self.updateZeta(sentence)
-                    self.updateXi(sentence)
+                    self.updateXi(doc, sentence)
                     self.updatePsi(sentence)
                     self.updateOmega(sentence)
                     self.updatePhi(sentence)
+                    sentence.updateVar()
                 self.qLogLikelihood(doc)
+                doc.updateVar()
 
     def qLogLikelihood(self, doc):
         pass
@@ -102,20 +106,34 @@ class CTMSAModel:
 
     def updateZeta(self, sentence):
         for k in range(self.K):
-            sentence.oldZeta += math.exp(sentence.psi[k]+sentence.oldOmega)
-        pass
+            sentence.zeta += math.exp(sentence.psi[k]+0.5*sentence.oldOmega**2)
 
-    def updateXi(self, sentence):
-        pass
+    def updateXi(self, doc, sentence):
+        """
+        update \xi in sentence
+        :param doc:
+        :param sentence:
+        :return:
+        """
+        C = self.K*sentence.oldOmega**2
+        C += np.inner(doc.oldNu,doc.oldNu)
+        _pg = sentence.psi-doc.oldGamma
+        C += np.inner(_pg, _pg)
+        C /= 2
+        sentence.xi = math.sqrt((2+self.K)**2/(16*C**2)+2*self.paraLambda/C)-(2+self.K)/(4*C)
 
     def updatePsi(self, sentence):
+        # todo updare psi using Newton Method
         pass
 
     def updateOmega(self, sentence):
+        # todo updare psi using Newton Method
         pass
 
     def updatePhi(self, sentence):
-        pass
+        for n in range(sentence.wordNum):
+            for k in range(self.K):
+                sentence.oldPhi[k] = math.exp(sentence.psi[k]-1)*self.beta[k,sentence.words[n]]
 
     def estimate(self):
         self.doEM(self.testDocs.getDocs())
