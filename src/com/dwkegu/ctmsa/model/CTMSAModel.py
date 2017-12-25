@@ -1,10 +1,12 @@
 import os
 import sys
 import time
+import math
 import numpy as np
-from CTMSA.src.com.dwkegu.ctmsa.util import mathUtil
-from CTMSA.src.com.dwkegu.ctmsa.model import Document
-from CTMSA.src.com.dwkegu.ctmsa import config
+from src.com.dwkegu.ctmsa.util import mathUtil
+from src.com.dwkegu.ctmsa.model import Document
+from src.com.dwkegu.ctmsa import config
+from ..util.FileSaver import FileSaver
 
 
 class CTMSAModel:
@@ -12,7 +14,7 @@ class CTMSAModel:
     correlated topic model with sentence attention
     """
 
-    def __init__(self, wordMap, topicNum=None, paraLambda=None):
+    def __init__(self, wordMap, maxEmIter=1000, maxVarIter=1000, convergence=1e-4, topicNum=None, paraLambda=None):
         """
         init model
         :param wordMap:
@@ -21,45 +23,109 @@ class CTMSAModel:
         """
         self.wordMap = wordMap
         self.K = (config.K if topicNum is None else topicNum)
-        self.docs = list()
+        self.docs = None
         self.mu = None
         self.sigma = None
         self.invSigma = None
         self.paraLambda = (config.paraLambda if paraLambda is None else paraLambda)
-        self.logoBeta = None
+        self.logBeta = None
+        self.beta = None
         self.lHood = 0
         self.trainDocs = None
         self.testDocs = None
-        # todo init zeta
-        self.zeta = 1
-        self.oldZeta = 1
+        self.detInvSigma = 1
+        self.maxEMIter = maxEmIter
+        self.maxVarIter = maxVarIter
+        self.convergence = convergence
+        self.saver = FileSaver()
 
     def initParameters(self):
-        self.mu = np.random.uniform(0, 1.0, [self.K])
+        self.mu = np.random.uniform(-0.1, 0.1, [self.K])
         mathUtil.simplexNorm(self.mu)
-        self.sigma = mathUtil.correlatedMatrixGenerate([self.K, self.K], 4.0)
+        self.sigma = mathUtil.correlatedMatrixGenerate([self.K, self.K], 1.0)
         self.invSigma = mathUtil.invMatrix(self.sigma)
+        self.detInvSigma = np.linalg.det(self.invSigma)
         self.beta = mathUtil.betaGenerate([self.K, self.wordMap.size()])
+        self.logBeta = np.log(self.beta)
 
     def inference(self):
-        for doc in self.docs:
-            for sentence in doc.sentences:
-                self.updateZeta(sentence)
-                self.updateGamma(sentence)
-                for word in sentence.words:
-                    pass
+        currentIter = 0
+        convergence = 1
+        self.docs = self.trainDocs
+        while currentIter < self.maxEMIter and convergence > self.convergence:
+            self.doEM(self.docs)
+            self.doEstimateParameters(self.docs)
+            self.pLogLikelihood(self.docs)
+            # todo update convergence
+            currentIter += 1
 
-    def updateZeta(self, sentence):
+    def doEM(self, docs):
+        for doc in docs:
+            cIter = 0
+            convergence = 1
+            while cIter < self.maxVarIter and doc.convergence < convergence:
+                self.updateGamma(doc)
+                self.updateNu(doc)
+                for sentence in doc.sentences:
+                    self.updateZeta(sentence)
+                    self.updateXi(sentence)
+                    self.updatePsi(sentence)
+                    self.updateOmega(sentence)
+                    self.updatePhi(sentence)
+                self.qLogLikelihood(doc)
+
+    def qLogLikelihood(self, doc):
         pass
 
-    def updateGamma(self, sentence):
+    def pLogLikelihood(self, docs):
+        pass
+
+    def doEstimateParameters(self, docs):
+        pass
+
+    def updateGamma(self, doc):
+        sumXi = doc.sumXi
+        psiSum = np.zeros([self.K], np.float64)
+        for sentence in doc.sentences:
+            psiSum += sentence.xi*sentence.psi
+        _mSigma = np.matrix(self.invSigma, copy=True)
+        for k in range(self.K):
+            _mSigma[k, k] += sumXi
+        _m1 = _mSigma.getI()
+        _v1 = self.invSigma*self.mu + psiSum
+        doc.gamma = _m1 * _v1
+
+    def updateNu(self, doc):
+        sumXi = doc.sumXi
+        for i in range(self.K):
+            doc.nu[i] = 1/math.sqrt(self.sigma[i, i]+sumXi)
+
+    def updateZeta(self, sentence):
+        for k in range(self.K):
+            sentence.oldZeta += math.exp(sentence.psi[k]+sentence.oldOmega)
+        pass
+
+    def updateXi(self, sentence):
+        pass
+
+    def updatePsi(self, sentence):
+        pass
+
+    def updateOmega(self, sentence):
+        pass
+
+    def updatePhi(self, sentence):
         pass
 
     def estimate(self):
+        self.doEM(self.testDocs.getDocs())
+
+    def setTrainDataset(self, docs):
+        self.trainDocs = docs
+
+    def setTestDataset(self, docs):
+        self.testDocs = docs
+
+    def saveParameters(self):
+        # todo save parameters
         pass
-
-    def setTrainDataset(self, dataset):
-        self.trainDocs = dataset
-
-    def setTestDataset(self, dataset):
-        self.testDocs = dataset
