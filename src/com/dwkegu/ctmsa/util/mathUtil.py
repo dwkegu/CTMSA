@@ -41,6 +41,8 @@ def correlatedMatrixGenerate(shape, scale):
     res = np.random.exponential(scale, shape)
     for i in range(shape[0]):
         res[i, i] = 1
+        for j in range(i+1, shape[0]):
+            res[i, j] = res[j, i]
     return res
 
 
@@ -60,3 +62,12 @@ def betaGenerate(shape):
 def invMatrix(m):
     result = np.matrix(m).getI()
     return result
+
+
+def normVec2One(vec):
+    sum = 0.0
+    vLength = vec.shape[0]
+    for i in range(vLength):
+        sum += vec[i]
+    for i in range(vLength):
+        vec[i] /= sum

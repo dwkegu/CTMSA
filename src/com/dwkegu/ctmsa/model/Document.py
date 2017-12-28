@@ -15,6 +15,20 @@ class Document:
         self.convergence = 1
         self.initDoc(rawIdDoc)
         self.sumXi = 0
+        self.initParameters()
+
+    def initParameters(self):
+        left = 1
+        for i in range(self.K-1):
+            self.gamma[i] = 1/self.K
+            self.oldGamma[i] = self.gamma[i]
+            left -= self.gamma[i]
+            self.nu[i] = 1
+            self.oldNu[i] = 1
+        self.nu[self.K-1] = 1
+        self.oldNu[self.K-1] = 1
+        self.gamma[self.K-1] = left
+        self.oldGamma[self.K-1] = self.gamma[self.K-1]
 
     def initDoc(self, rawIdDoc):
         self.sentences.clear()
@@ -30,5 +44,7 @@ class Document:
         return self.sentences[i]
 
     def updateVar(self):
-        self.oldGamma = self.gamma
-        self.oldNu = self.nu
+        for i in range(self.K):
+            self.oldGamma[i] = self.gamma[i]
+            self.oldNu[i] = self.nu[i]
+
