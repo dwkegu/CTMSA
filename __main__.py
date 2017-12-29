@@ -1,3 +1,3 @@
-from src.com.dwkegu.ctmsa import ctmsa
+from CTMSA.src import ctmsa
 
 ctmsa.ctmsa()
